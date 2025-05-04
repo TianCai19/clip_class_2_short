@@ -1,0 +1,9 @@
+cookies.txt
+.pyc
+__pycache__/
+*.py[cod]
+*.pyo
+.DS_Store
+*.egg-info/
+*.egg
+/downloads

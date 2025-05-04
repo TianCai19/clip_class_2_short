@@ -1,0 +1,8 @@
+# Python package dependencies
+yt-dlp>=2023.3.4
+
+# System dependencies (install separately)
+# - FFmpeg (required for video processing)
+#   Install on macOS: brew install ffmpeg
+#   Install on Ubuntu/Debian: apt-get install ffmpeg
+#   Install on Windows: Download from https://ffmpeg.org/download.html
