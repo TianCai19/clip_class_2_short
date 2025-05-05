@@ -1,11 +1,28 @@
 import os
 import subprocess
+import json
 
 def download_video(url, output_dir):
     """
     Downloads a YouTube video using yt-dlp with cookies for authentication.
     Forces MP4 as the output format with AAC audio for compatibility.
+    Returns the title of the downloaded video.
     """
+    # First get the video info to extract the title
+    title_command = [
+        "yt-dlp",
+        "--cookies", "cookies.txt",
+        "--print", "%(title)s",
+        "--no-download",
+        url
+    ]
+    
+    try:
+        result = subprocess.run(title_command, check=True, capture_output=True, text=True)
+        video_title = result.stdout.strip()
+    except subprocess.CalledProcessError:
+        video_title = ""  # Default to empty string if can't get title
+    
     command = [
         "yt-dlp",
         "--cookies", "cookies.txt",  # Use cookies for authentication
@@ -29,3 +46,5 @@ def download_video(url, output_dir):
     except subprocess.CalledProcessError:
         print("First download method failed, trying alternative approach...")
         subprocess.run(fallback_command, check=True)
+    
+    return video_title

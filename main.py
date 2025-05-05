@@ -1,5 +1,7 @@
 import os
 import hashlib
+import re
+import shutil
 from downloader import download_video
 from clipper import clip_video, cleanup_temp_files
 
@@ -22,15 +24,34 @@ def add_processed_url(url, cache_file):
     with open(cache_file, 'a') as file:
         file.write(f"{url}\n")
 
-def get_video_directory(url, base_dir):
-    """Create a unique directory name for the video based on URL hash."""
+def sanitize_filename(filename):
+    """Sanitize the filename to make it safe for use in a directory name."""
+    # Replace special characters with underscores
+    sanitized = re.sub(r'[\\/*?:"<>|]', "_", filename)
+    # Replace special unicode characters and symbols
+    sanitized = re.sub(r'[^\x00-\x7F]', "_", sanitized)
+    # Replace multiple consecutive underscores with a single one
+    sanitized = re.sub(r'_+', "_", sanitized)
+    # Limit the length to avoid path too long error - be more conservative
+    if len(sanitized) > 40:
+        sanitized = sanitized[:37] + "..."
+    # Remove trailing dots and spaces which can cause issues on Windows
+    sanitized = sanitized.rstrip(". ")
+    return sanitized
+
+def create_folder_name(url, video_title=""):
+    """Create a folder name with URL hash and title (if available)."""
     # Create a hash of the URL to use as a unique ID
     url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
     
-    # Create a directory path
-    video_dir = os.path.join(base_dir, f"video_{url_hash}")
-    os.makedirs(video_dir, exist_ok=True)
-    return video_dir
+    # Create a directory name with hash (for uniqueness) and title (for readability)
+    if video_title:
+        sanitized_title = sanitize_filename(video_title)
+        dir_name = f"video_{url_hash}_{sanitized_title}"
+    else:
+        dir_name = f"video_{url_hash}"
+    
+    return dir_name
 
 def main():
     # Setup
@@ -54,27 +75,43 @@ def main():
             
         print(f"\nProcessing video {i+1}/{len(urls)}: {url}")
         
-        # Create a separate directory for this video
-        video_directory = get_video_directory(url, base_directory)
-        print(f"Video will be stored in: {video_directory}")
-        
         try:
-            # Step 1: Download
+            # 1. First, get the video title without downloading
+            print("Getting video info...")
+            title_command = ["yt-dlp", "--cookies", "cookies.txt", "--print", "%(title)s", "--no-download", url]
+            
+            import subprocess
+            try:
+                result = subprocess.run(title_command, check=True, capture_output=True, text=True)
+                video_title = result.stdout.strip()
+                print(f"Video title: {video_title}")
+            except subprocess.CalledProcessError:
+                video_title = ""
+                print("Could not get video title, will use hash only")
+            
+            # 2. Create the final directory with title (if available)
+            folder_name = create_folder_name(url, video_title)
+            video_directory = os.path.join(base_directory, folder_name)
+            os.makedirs(video_directory, exist_ok=True)
+            
+            print(f"Video will be stored in: {video_directory}")
+            
+            # 3. Download video directly to the final directory
             print("Downloading video...")
             download_video(url, video_directory)
             
-            # Step 2: Find the downloaded video file
+            # 4. Find the downloaded video file
             video_files = [os.path.join(video_directory, f) for f in os.listdir(video_directory) 
                         if f.endswith(('.mp4', '.mkv')) and "_part_" not in f]
             
             if video_files:
                 latest_video = max(video_files, key=os.path.getmtime)
                 
-                # Step 3: Clip
+                # 5. Clip
                 print(f"Clipping video: {os.path.basename(latest_video)}")
                 clip_video(latest_video, video_directory)
                 
-                # Step 4: Cleanup
+                # 6. Cleanup
                 cleanup_temp_files(video_directory)
                 
                 # Mark URL as processed
