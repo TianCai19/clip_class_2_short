@@ -28,8 +28,6 @@ def sanitize_filename(filename):
     """Sanitize the filename to make it safe for use in a directory name."""
     # Replace special characters with underscores
     sanitized = re.sub(r'[\\/*?:"<>|]', "_", filename)
-    # Replace special unicode characters and symbols
-    sanitized = re.sub(r'[^\x00-\x7F]', "_", sanitized)
     # Replace multiple consecutive underscores with a single one
     sanitized = re.sub(r'_+', "_", sanitized)
     # Limit the length to avoid path too long error - be more conservative
